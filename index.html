@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameHub</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Game navigation">
+      <button class="brand-button" id="brandButton" type="button" aria-label="Game hub">
+        <span class="brand-mark">GH</span>
+      </button>
+
+      <nav class="game-menu" aria-label="Games">
+        <button class="nav-item is-active" type="button" data-game="hub">
+          <span class="nav-glyph hub-glyph" aria-hidden="true"></span>
+          <span>Hub</span>
+        </button>
+        <button class="nav-item" type="button" data-game="snake">
+          <span class="nav-glyph snake-glyph" aria-hidden="true"></span>
+          <span>Snake Run</span>
+        </button>
+        <button class="nav-item" type="button" data-game="memory">
+          <span class="nav-glyph memory-glyph" aria-hidden="true"></span>
+          <span>Memory Match</span>
+        </button>
+        <button class="nav-item" type="button" data-game="poople">
+          <span class="nav-glyph poople-glyph" aria-hidden="true"></span>
+          <span>Poople</span>
+        </button>
+        <button class="nav-item" type="button" data-game="angle">
+          <span class="nav-glyph angle-glyph" aria-hidden="true"></span>
+          <span>Guess the Angle</span>
+        </button>
+        <button class="nav-item" type="button" data-game="connect4">
+          <span class="nav-glyph connect-glyph" aria-hidden="true"></span>
+          <span>Connect 4</span>
+        </button>
+        <button class="nav-item" type="button" data-game="world">
+          <span class="nav-glyph world-glyph" aria-hidden="true"></span>
+          <span>World Countries</span>
+        </button>
+        <button class="nav-item" type="button" data-game="shape">
+          <span class="nav-glyph shape-glyph" aria-hidden="true"></span>
+          <span>Country Shape</span>
+        </button>
+        <button class="nav-item" type="button" data-game="tictactoe">
+          <span class="nav-glyph ttt-glyph" aria-hidden="true"></span>
+          <span>Tic Tac Toe</span>
+        </button>
+        <button class="nav-item" type="button" data-game="target">
+          <span class="nav-glyph target-glyph" aria-hidden="true"></span>
+          <span>Reflex Grid</span>
+        </button>
+      </nav>
+    </aside>
+
+    <main class="main-stage">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="gameGenre">Vanilla Arcade</p>
+          <h1 id="gameTitle">GameHub</h1>
+        </div>
+        <div class="toolbar" aria-label="Game actions">
+          <button class="icon-button" id="homeButton" type="button" aria-label="Game hub" title="Game hub" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 10.8 12 3l9 7.8v9.7a.5.5 0 0 1-.5.5H15v-6H9v6H3.5a.5.5 0 0 1-.5-.5v-9.7Z"></path>
+            </svg>
+          </button>
+          <button class="icon-button" id="restartButton" type="button" aria-label="Restart game" title="Restart game" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 7v5h-5l1.9-1.9A5.5 5.5 0 1 0 17 15.7l1.9 1.2A7.5 7.5 0 1 1 14.5 5.5L12.8 7H19Z"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="metrics" aria-label="Current game stats">
+        <div class="metric">
+          <span id="metricOneLabel">Games</span>
+          <strong id="metricOneValue">9</strong>
+        </div>
+        <div class="metric">
+          <span id="metricTwoLabel">Best Total</span>
+          <strong id="metricTwoValue">0</strong>
+        </div>
+        <div class="metric">
+          <span id="metricThreeLabel">State</span>
+          <strong id="metricThreeValue">Ready</strong>
+        </div>
+      </section>
+
+      <div class="content-grid">
+        <section class="game-panel" id="gamePanel" aria-live="polite"></section>
+        <aside class="context-panel" id="contextPanel" aria-label="Game board"></aside>
+      </div>
+    </main>
+  </div>
+
+  <script src="world-map-data.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
