@@ -1,4 +1,4 @@
-const gamePanel = document.querySelector("#gamePanel");
+﻿const gamePanel = document.querySelector("#gamePanel");
 const contextPanel = document.querySelector("#contextPanel");
 const gameTitle = document.querySelector("#gameTitle");
 const gameGenre = document.querySelector("#gameGenre");
@@ -16,15 +16,15 @@ const metricEls = {
 };
 
 const catalog = [
-  { id: "snake", title: "Snake Run", genre: "Arcade", bestKey: "gamehub.snake.best" },
-  { id: "memory", title: "Memory Match", genre: "Puzzle", bestKey: "gamehub.memory.best" },
-  { id: "poople", title: "Poople", genre: "Word", bestKey: "gamehub.poople.steps.best" },
-  { id: "angle", title: "Guess the Angle", genre: "Precision", bestKey: "gamehub.angle.hotcold.best" },
-  { id: "connect4", title: "Connect 4", genre: "Strategy", bestKey: "gamehub.connect4.best" },
-  { id: "world", title: "World Countries", genre: "Geography", bestKey: "gamehub.world.best" },
-  { id: "shape", title: "Country Shape", genre: "Geography", bestKey: "gamehub.shape.best" },
-  { id: "tictactoe", title: "Tic Tac Toe", genre: "Strategy", bestKey: "gamehub.tictactoe.best" },
-  { id: "target", title: "Reflex Grid", genre: "Reflex", bestKey: "gamehub.target.best" }
+  { id: "snake", title: "Snake Run", genre: "Arcade", duration: "3 min", difficulty: "Medium", bestKey: "gamehub.snake.best" },
+  { id: "memory", title: "Memory Match", genre: "Puzzle", duration: "4 min", difficulty: "Easy", bestKey: "gamehub.memory.best" },
+  { id: "poople", title: "Poople", genre: "Word", duration: "3 min", difficulty: "Medium", bestKey: "gamehub.poople.steps.best" },
+  { id: "angle", title: "Guess the Angle", genre: "Precision", duration: "5 min", difficulty: "Medium", bestKey: "gamehub.angle.hotcold.best" },
+  { id: "connect4", title: "Connect 4", genre: "Strategy", duration: "5 min", difficulty: "Easy", bestKey: "gamehub.connect4.best" },
+  { id: "world", title: "World Countries", genre: "Geography", duration: "15 min", difficulty: "Hard", bestKey: "gamehub.world.best" },
+  { id: "shape", title: "Country Shape", genre: "Geography", duration: "5 min", difficulty: "Medium", bestKey: "gamehub.shape.best" },
+  { id: "tictactoe", title: "Tic Tac Toe", genre: "Strategy", duration: "3 min", difficulty: "Easy", bestKey: "gamehub.tictactoe.best" },
+  { id: "target", title: "Reflex Grid", genre: "Reflex", duration: "30 sec", difficulty: "Fast", bestKey: "gamehub.target.best" }
 ];
 
 const renderers = {
@@ -232,10 +232,34 @@ function loadGame(id) {
   }
 
   currentGame = id;
+  document.body.dataset.game = id;
+  if (id !== "hub") {
+    setPreference("gamehub.lastPlayed", id);
+  }
   navItems.forEach((item) => item.classList.toggle("is-active", item.dataset.game === id));
   homeButton.hidden = id === "hub";
   restartButton.hidden = id === "hub";
+  window.scrollTo({ top: 0, behavior: "instant" });
+  showContextPanel(false);
+  setGamePhase(id === "hub" ? "ready" : "playing");
   renderers[id]();
+
+  const activeNavItem = navItems.find((item) => item.dataset.game === id);
+  if (activeNavItem && window.matchMedia("(max-width: 980px)").matches) {
+    window.requestAnimationFrame(() => {
+      const menu = activeNavItem.closest(".game-menu");
+      if (menu) {
+        menu.scrollLeft = activeNavItem.offsetLeft - ((menu.clientWidth - activeNavItem.offsetWidth) / 2);
+      }
+    });
+  }
+}
+
+function showContextPanel(show) {
+  const grid = document.querySelector("#contentGrid");
+  if (grid) {
+    grid.classList.toggle("no-context", !show);
+  }
 }
 
 function setHeader(title, genre) {
@@ -250,6 +274,24 @@ function setMetrics(firstLabel, firstValue, secondLabel, secondValue, thirdLabel
   metricEls.twoValue.textContent = secondValue;
   metricEls.threeLabel.textContent = thirdLabel;
   metricEls.threeValue.textContent = thirdValue;
+}
+
+function setGamePhase(phase) {
+  gamePanel.dataset.phase = phase;
+}
+
+function getStoredChoice(key, choices, fallback) {
+  const stored = localStorage.getItem(key);
+  return choices.includes(stored) ? stored : fallback;
+}
+
+function getStoredBoolean(key, fallback) {
+  const stored = localStorage.getItem(key);
+  return stored === null ? fallback : stored === "true";
+}
+
+function setPreference(key, value) {
+  localStorage.setItem(key, String(value));
 }
 
 function setContext(title, rows) {
@@ -291,31 +333,61 @@ function totalBest() {
 
 function renderHub() {
   setHeader("GameHub", "Vanilla Arcade");
-  setMetrics("Games", catalog.length, "Best Total", totalBest(), "State", "Ready");
+  setMetrics("Games", catalog.length, "State", "Ready", "Library", "Local");
+  showContextPanel(false);
+
+  const quickIds = ["snake", "memory", "tictactoe", "target"];
+  const skillIds = ["poople", "angle", "connect4", "world", "shape"];
+  const quickGames = catalog.filter((g) => quickIds.includes(g.id));
+  const skillGames = catalog.filter((g) => skillIds.includes(g.id));
 
   gamePanel.innerHTML = `
-    <div class="hub-grid">
-      ${catalog.map((game) => gameCardMarkup(game)).join("")}
+    <div class="hub-sections">
+      <div class="hub-section">
+        <div class="hub-section-header">
+          <div>
+            <p class="hub-section-kicker">Quick play</p>
+            <h2 class="hub-section-title">Short rounds</h2>
+          </div>
+          <span class="hub-section-desc">Under 5 minutes</span>
+        </div>
+        <div class="hub-grid--quick">
+          ${quickGames.map((game) => gameCardMarkup(game)).join("")}
+        </div>
+      </div>
+      <div class="hub-section">
+        <div class="hub-section-header">
+          <div>
+            <p class="hub-section-kicker">Deep play</p>
+            <h2 class="hub-section-title">Skill and knowledge</h2>
+          </div>
+          <span class="hub-section-desc">Longer challenges</span>
+        </div>
+        <div class="hub-grid--deep">
+          ${skillGames.map((game) => gameCardMarkup(game)).join("")}
+        </div>
+      </div>
     </div>
   `;
 
   gamePanel.querySelectorAll("[data-play]").forEach((button) => {
     button.addEventListener("click", () => loadGame(button.dataset.play));
   });
-
-  setContext("Best Board", catalog.map((game) => ({
-    label: game.title,
-    value: bestLabel(game.id)
-  })));
 }
 
 function gameCardMarkup(game) {
+  const wasLastPlayed = localStorage.getItem("gamehub.lastPlayed") === game.id;
   return `
     <article class="game-card">
       ${previewMarkup(game.id)}
       <div>
         <h2>${game.title}</h2>
-        <p class="card-meta"><span>${game.genre}</span><span>${bestLabel(game.id)}</span></p>
+        <p class="card-meta">
+          <span>${game.duration}</span>
+          <span aria-hidden="true">/</span>
+          <span>${game.difficulty}</span>
+          ${wasLastPlayed ? '<span class="last-played">Last played</span>' : ""}
+        </p>
       </div>
       <button class="play-button" type="button" data-play="${game.id}">Play</button>
     </article>
@@ -398,7 +470,7 @@ function bestLabel(id) {
   const best = getBest(game.bestKey);
 
   if (!best) {
-    return "Best 0";
+    return "";
   }
 
   if (id === "memory") {
@@ -442,16 +514,19 @@ function renderSnake() {
           <span class="pad-button empty"></span>
         </div>
       </div>
+      <button class="play-button replay-button" id="snakeAgain" type="button" hidden>Play again</button>
     </div>
   `;
 
   const canvas = gamePanel.querySelector("#snakeCanvas");
+  const againButton = gamePanel.querySelector("#snakeAgain");
   const ctx = canvas.getContext("2d");
   let timer = window.setInterval(tick, 120);
 
   gamePanel.querySelectorAll("[data-dir]").forEach((button) => {
     button.addEventListener("click", () => setSnakeDirection(button.dataset.dir, state));
   });
+  againButton.addEventListener("click", () => loadGame("snake"));
 
   const keyHandler = (event) => {
     const keyMap = {
@@ -543,12 +618,17 @@ function setSnakeDirection(direction, state) {
 }
 
 function updateSnakeStats(state) {
-  setMetrics("Score", state.score, "Best", state.best, "Length", state.snake.length);
-  setContext("Run Board", [
-    { label: "Score", value: state.score },
-    { label: "Best", value: state.best },
-    { label: "State", value: state.alive ? "Live" : "Done" }
-  ]);
+  const againButton = gamePanel.querySelector("#snakeAgain");
+  const dPad = gamePanel.querySelector(".d-pad");
+  if (againButton) {
+    againButton.hidden = state.alive;
+  }
+  if (dPad) {
+    dPad.hidden = !state.alive;
+  }
+  setGamePhase(state.alive ? "playing" : "result");
+  setMetrics("Score", state.score, "Best", state.best || "—", "Length", state.snake.length);
+  showContextPanel(false);
 }
 
 function drawSnake(ctx, state, size) {
@@ -586,12 +666,28 @@ function drawSnake(ctx, state, size) {
   ctx.fill();
 
   if (!state.alive) {
-    ctx.fillStyle = "rgba(17, 20, 24, 0.72)";
+    ctx.fillStyle = "rgba(17, 20, 24, 0.82)";
     ctx.fillRect(0, 0, width, width);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 44px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Done", width / 2, width / 2);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "900 40px system-ui, sans-serif";
+    ctx.fillText("Game Over", width / 2, width / 2 - 36);
+
+    ctx.font = "700 22px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.fillText(`Score: ${state.score}`, width / 2, width / 2 + 6);
+
+    if (state.score > 0 && state.score === state.best) {
+      ctx.fillStyle = "#f4d35e";
+      ctx.font = "800 18px system-ui, sans-serif";
+      ctx.fillText("New Best!", width / 2, width / 2 + 34);
+    } else if (state.best > 0) {
+      ctx.fillStyle = "rgba(255,255,255,0.5)";
+      ctx.font = "700 16px system-ui, sans-serif";
+      ctx.fillText(`Best: ${state.best}`, width / 2, width / 2 + 34);
+    }
+
   }
 }
 
@@ -661,7 +757,7 @@ function renderMemory() {
       const isOpen = state.flipped.includes(index);
       const isMatched = state.matched.has(index);
       return `
-        <button class="memory-card ${isOpen ? "is-open" : ""} ${isMatched ? "is-matched" : ""}" type="button" data-index="${index}" aria-label="Card ${index + 1}">
+        <button class="memory-card ${isOpen ? "is-open" : ""} ${isMatched ? "is-matched" : ""}" type="button" data-index="${index}" aria-label="Card ${index + 1}" ${isMatched ? "disabled" : ""}>
           <span class="memory-face memory-back"></span>
           <span class="memory-face memory-front">
             <span class="memory-token token-${value}">${letters[value]}</span>
@@ -671,12 +767,26 @@ function renderMemory() {
     }).join("");
 
     const pairs = state.matched.size / 2;
-    setMetrics("Pairs", `${pairs}/8`, "Moves", state.moves, "Best", state.best || 0);
-    setContext("Match Board", [
-      { label: "Pairs", value: `${pairs}/8` },
-      { label: "Moves", value: state.moves },
-      { label: "State", value: state.done ? "Done" : "Live" }
-    ]);
+    setGamePhase(state.done ? "result" : "playing");
+    setMetrics("Pairs", `${pairs}/8`, "Moves", state.moves, "Best", state.best || "—");
+    showContextPanel(false);
+
+    if (state.done) {
+      const rating = memoryQualityRating(state.moves);
+      const overlay = document.createElement("div");
+      overlay.className = "memory-done";
+      overlay.innerHTML = `
+        <div class="game-result-copy">
+          <p class="memory-done-title">All pairs found</p>
+          <p class="memory-done-score">${state.moves} moves</p>
+          <p class="memory-done-rating ${rating.cls}">${rating.label}</p>
+          <button class="play-button replay-button" type="button">Play again</button>
+        </div>
+      `;
+      board.parentElement.style.position = "relative";
+      board.parentElement.appendChild(overlay);
+      overlay.querySelector("button").addEventListener("click", () => loadGame("memory"));
+    }
   }
 }
 
@@ -730,6 +840,13 @@ function shuffle(items) {
   return copy;
 }
 
+function memoryQualityRating(moves) {
+  if (moves <= 12) return { cls: "rating-excellent", label: "Excellent" };
+  if (moves <= 18) return { cls: "rating-good", label: "Good" };
+  if (moves <= 26) return { cls: "rating-fair", label: "Fair" };
+  return { cls: "rating-fair", label: "Keep practising" };
+}
+
 function renderPoople() {
   const game = catalog.find((item) => item.id === "poople");
   const puzzle = dailyPooplePuzzle();
@@ -745,9 +862,10 @@ function renderPoople() {
   gamePanel.innerHTML = `
     <div class="poople-shell">
       <div class="poople-goal" aria-label="Poople target">
-        <span>${puzzle.start}</span>
+        <span class="start-word">${puzzle.start}</span>
         <strong>${poopleTarget}</strong>
       </div>
+      <p class="poople-rule">Change one letter at a time to reach <strong>${poopleTarget}</strong></p>
       <div class="poople-ladder" id="poopleLadder" aria-label="Poople word ladder"></div>
       <form class="poople-form" id="poopleForm">
         <label class="sr-only" for="poopleInput">Next word</label>
@@ -758,6 +876,7 @@ function renderPoople() {
         </div>
       </form>
       <p class="poople-status" id="poopleStatus" aria-live="polite"></p>
+      <button class="play-button replay-button" id="poopleAgain" type="button" hidden>Play again</button>
     </div>
   `;
 
@@ -766,6 +885,7 @@ function renderPoople() {
   const input = gamePanel.querySelector("#poopleInput");
   const hintButton = gamePanel.querySelector("#poopleHintButton");
   const status = gamePanel.querySelector("#poopleStatus");
+  const againButton = gamePanel.querySelector("#poopleAgain");
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -806,6 +926,7 @@ function renderPoople() {
     renderBoard();
     input.focus();
   });
+  againButton.addEventListener("click", () => loadGame("poople"));
 
   renderBoard();
   input.focus();
@@ -813,18 +934,36 @@ function renderPoople() {
   cleanupCurrent = null;
 
   function renderBoard() {
-    ladder.innerHTML = state.path.map((word, index) => poopleRowMarkup(word, state.path[index - 1], index === 0)).join("");
+    const pathRows = state.path.map((word, index) => ({
+      word,
+      previousWord: state.path[index - 1],
+      isStart: index === 0
+    }));
+    const visibleRows = pathRows.length <= 6
+      ? pathRows
+      : [pathRows[0], { collapsed: pathRows.length - 5 }, ...pathRows.slice(-4)];
+    ladder.innerHTML = visibleRows.map((row) => row.collapsed
+      ? `<div class="poople-collapsed">${row.collapsed} earlier</div>`
+      : poopleRowMarkup(row.word, row.previousWord, row.isStart)).join("");
     input.disabled = state.solved;
     hintButton.disabled = state.solved;
+    form.hidden = state.solved;
+    againButton.hidden = !state.solved;
     status.textContent = state.message;
+    status.dataset.tone = state.solved
+      ? "correct"
+      : state.message.startsWith("Try ")
+        ? "close"
+        : ["Ready", "Accepted"].includes(state.message) ? "neutral" : "error";
+    setGamePhase(state.solved ? "result" : "playing");
 
-    setMetrics("Steps", poopleSteps(state), "Best", state.best || 0, "Current", currentPoopleWord(state));
-    setContext("Poople Board", [
-      { label: "Start", value: puzzle.start },
-      { label: "Target", value: poopleTarget },
-      { label: "Hints", value: state.hintCount },
-      { label: "State", value: state.solved ? "Done" : "Live" }
-    ]);
+    const steps = poopleSteps(state);
+    const optimalLength = dailyPooplePuzzle().path.length - 1;
+    const behindLabel = steps > 0 && optimalLength > 0 && steps > optimalLength
+      ? ` (+${steps - optimalLength})`
+      : "";
+    setMetrics("Steps", steps || "—", "Best", state.best || "—", "Hints Used", state.hintCount);
+    showContextPanel(false);
   }
 }
 
@@ -953,11 +1092,13 @@ function renderAngle() {
         <input class="angle-input" id="angleInput" type="number" min="0" max="360" step="1" inputmode="numeric" placeholder="0-360">
         <button class="play-button" id="angleSubmit" type="submit">Guess</button>
       </form>
-      <div class="angle-history" id="angleHistory" aria-label="Angle guesses"></div>
       <p class="angle-status" id="angleStatus" aria-live="polite"></p>
+      <div class="angle-history" id="angleHistory" aria-label="Recent angle guesses"></div>
+      <button class="play-button replay-button" id="angleAgain" type="button" hidden>Play again</button>
     </div>
   `;
 
+  const angleBoard = gamePanel.querySelector("#angleBoard");
   const angleRay = gamePanel.querySelector("#angleRay");
   const angleArc = gamePanel.querySelector("#angleArc");
   const form = gamePanel.querySelector("#angleForm");
@@ -965,6 +1106,8 @@ function renderAngle() {
   const submit = gamePanel.querySelector("#angleSubmit");
   const history = gamePanel.querySelector("#angleHistory");
   const status = gamePanel.querySelector("#angleStatus");
+  const againButton = gamePanel.querySelector("#angleAgain");
+  againButton.addEventListener("click", () => loadGame("angle"));
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1022,20 +1165,35 @@ function renderAngle() {
 
   function renderBoard() {
     drawAngle(angleRay, angleArc, state.target);
+    angleBoard.classList.remove("is-correct", "is-close", "is-warm", "is-cold");
+    if (state.history.length) {
+      angleBoard.classList.add(angleFeedbackClass(state.history[state.history.length - 1].feedback));
+    }
     input.disabled = state.done;
     submit.disabled = state.done;
-    history.innerHTML = state.history.map((entry) => `
-      <span class="angle-chip ${angleFeedbackClass(entry.feedback)}">${entry.guess}</span>
-    `).join("");
+    form.hidden = state.done;
+    againButton.hidden = !state.done;
+    const recentHistory = state.history.slice(-5).reverse();
+    history.innerHTML = recentHistory.map((entry) => {
+      const dir = angleDirectionHint(entry.guess, state.target, state.done || entry === state.history[state.history.length - 1]);
+      return `
+        <span class="angle-chip ${angleFeedbackClass(entry.feedback)}">
+          ${entry.guess}°
+          ${dir ? `<span class="chip-dir">${dir}</span>` : ""}
+        </span>
+      `;
+    }).join("") + (state.history.length > recentHistory.length
+      ? `<span class="history-overflow">+${state.history.length - recentHistory.length} earlier</span>`
+      : "");
     status.textContent = state.message;
+    status.dataset.tone = state.message.startsWith("Correct") || state.done
+      ? "correct"
+      : state.message === "Use 0 to 360"
+        ? "error"
+        : ["Burning hot", "Hot", "Hotter", "Warm", "Same temp"].includes(state.message) ? "close" : "neutral";
+    setGamePhase(state.done ? "result" : "playing");
     setMetrics("Score", state.score, "Best", state.best, "Round", `${Math.min(state.solvedRounds + 1, maxRounds)}/${maxRounds}`);
-    setContext("Angle Board", [
-      { label: "Attempts", value: state.attempts },
-      { label: "Last Guess", value: state.lastGuess || "--" },
-      { label: "Feedback", value: state.feedback },
-      { label: "Last Target", value: state.lastSolved || "--" },
-      { label: "State", value: state.done ? "Done" : "Live" }
-    ]);
+    showContextPanel(false);
   }
 }
 
@@ -1108,8 +1266,12 @@ function angleFeedback(diff, previousDiff) {
 }
 
 function angleFeedbackClass(feedback) {
-  if (feedback === "Correct" || feedback === "Burning hot" || feedback === "Hotter" || feedback === "Hot") {
-    return "is-hot";
+  if (feedback === "Correct") {
+    return "is-correct";
+  }
+
+  if (feedback === "Burning hot" || feedback === "Hotter" || feedback === "Hot") {
+    return "is-close";
   }
 
   if (feedback === "Warm" || feedback === "Same temp") {
@@ -1117,6 +1279,25 @@ function angleFeedbackClass(feedback) {
   }
 
   return "is-cold";
+}
+
+function angleDirectionHint(guess, target, isLatest) {
+  if (!isLatest) {
+    return "";
+  }
+
+  const diff = guess - target;
+  const normalizedDiff = ((diff % 360) + 360) % 360;
+  if (normalizedDiff === 0) {
+    return "";
+  }
+
+  // Choose the shorter arc direction
+  if (normalizedDiff <= 180) {
+    return "↓ lower";
+  }
+
+  return "↑ higher";
 }
 
 function renderConnect4() {
@@ -1130,29 +1311,58 @@ function renderConnect4() {
     p2Wins: 0,
     best: getBest(game.bestKey),
     done: false,
-    message: "P1 turn"
+    winLine: [],
+    message: "Red's turn"
   };
 
   setHeader(game.title, game.genre);
   gamePanel.innerHTML = `
     <div class="connect-shell">
-      <div class="connect-board" id="connectBoard" aria-label="Connect 4 board"></div>
-      <button class="mode-button connect-next" id="connectNext" type="button" disabled>Next Round</button>
+      <div class="connect-col-row" id="connectCols" aria-label="Drop column"></div>
       <p class="connect-status" id="connectStatus" aria-live="polite"></p>
+      <div class="connect-board" id="connectBoard" aria-label="Connect 4 board"></div>
+      <button class="play-button connect-next" id="connectNext" type="button" disabled hidden>Play again</button>
     </div>
   `;
 
+  const colRow = gamePanel.querySelector("#connectCols");
   const board = gamePanel.querySelector("#connectBoard");
   const nextButton = gamePanel.querySelector("#connectNext");
   const status = gamePanel.querySelector("#connectStatus");
 
-  board.addEventListener("click", (event) => {
-    const cell = event.target.closest(".connect-cell");
-    if (!cell || state.done) {
-      return;
-    }
+  function renderBoard() {
+    // Column drop buttons
+    colRow.innerHTML = Array.from({ length: cols }, (_, col) => {
+      const isFull = state.board[0][col] !== 0;
+      return `<button class="connect-col-btn" type="button" data-col="${col}" aria-label="Drop in column ${col + 1}" ${state.done || isFull ? "disabled" : ""}>&#9660;</button>`;
+    }).join("");
 
-    const col = Number(cell.dataset.col);
+    // Board cells (display only)
+    board.innerHTML = state.board.map((row, rowIndex) =>
+      row.map((value, colIndex) => {
+        const isWinner = state.winLine.some(([r, c]) => r === rowIndex && c === colIndex);
+        const cls = [value ? `is-p${value}` : "", isWinner ? "is-winner" : ""].filter(Boolean).join(" ");
+        return `
+          <span class="connect-cell ${cls}" data-row="${rowIndex}" data-col="${colIndex}">
+            <span></span>
+          </span>
+        `;
+      }).join("")
+    ).join("");
+
+    nextButton.disabled = !state.done;
+    nextButton.hidden = !state.done;
+    colRow.classList.toggle("is-p1", state.player === 1 && !state.done);
+    colRow.classList.toggle("is-p2", state.player === 2 && !state.done);
+    status.textContent = state.message;
+    status.dataset.player = state.done ? "" : `${state.player}`;
+    setGamePhase(state.done ? "result" : "playing");
+    setMetrics("Red Wins", state.p1Wins, "Yellow Wins", state.p2Wins, "Best", state.best || "—");
+    showContextPanel(false);
+  }
+
+  function handleColumnDrop(col) {
+    if (state.done) return;
     const row = dropConnectPiece(state.board, col, state.player);
     if (row === -1) {
       state.message = "Column full";
@@ -1160,8 +1370,10 @@ function renderConnect4() {
       return;
     }
 
-    if (connectHasWin(state.board, row, col, state.player)) {
+    const winLine = connectWinLine(state.board, row, col, state.player);
+    if (winLine.length >= 4) {
       state.done = true;
+      state.winLine = winLine;
       state.message = `${connectPlayerName(state.player)} wins`;
       if (state.player === 1) {
         state.p1Wins += 1;
@@ -1174,44 +1386,63 @@ function renderConnect4() {
       state.message = "Draw";
     } else {
       state.player = state.player === 1 ? 2 : 1;
-      state.message = `${connectPlayerName(state.player)} turn`;
+      state.message = `${connectPlayerName(state.player)}'s turn`;
     }
-
     renderBoard();
+  }
+
+  colRow.addEventListener("click", (event) => {
+    const btn = event.target.closest(".connect-col-btn");
+    if (!btn || btn.disabled) return;
+    handleColumnDrop(Number(btn.dataset.col));
   });
+
+  colRow.addEventListener("mouseenter", (event) => {
+    const btn = event.target.closest(".connect-col-btn");
+    if (!btn || btn.disabled) return;
+    const col = Number(btn.dataset.col);
+    const row = getConnectDropRow(state.board, col);
+    if (row === -1) return;
+    const cells = board.querySelectorAll(".connect-cell");
+    const cellIndex = row * cols + col;
+    if (cells[cellIndex]) {
+      cells[cellIndex].classList.add(state.player === 1 ? "is-preview-p1" : "is-preview-p2");
+    }
+    btn.classList.add(state.player === 1 ? "preview-p1" : "preview-p2");
+  }, true);
+
+  colRow.addEventListener("mouseleave", (event) => {
+    const btn = event.target.closest(".connect-col-btn");
+    board.querySelectorAll(".is-preview-p1, .is-preview-p2").forEach((el) => {
+      el.classList.remove("is-preview-p1", "is-preview-p2");
+    });
+    if (btn) {
+      btn.classList.remove("preview-p1", "preview-p2");
+    }
+  }, true);
 
   nextButton.addEventListener("click", () => {
     state.board = createConnectBoard(rows, cols);
     state.player = state.player === 1 ? 2 : 1;
     state.done = false;
-    state.message = `${connectPlayerName(state.player)} turn`;
+    state.winLine = [];
+    state.message = `${connectPlayerName(state.player)}'s turn`;
     renderBoard();
   });
 
   renderBoard();
   cleanupCurrent = null;
-
-  function renderBoard() {
-    board.innerHTML = state.board.map((row, rowIndex) => row.map((value, colIndex) => `
-      <button class="connect-cell ${value ? `is-p${value}` : ""}" type="button" data-row="${rowIndex}" data-col="${colIndex}" aria-label="Column ${colIndex + 1}, row ${rowIndex + 1}" ${state.done ? "disabled" : ""}>
-        <span></span>
-      </button>
-    `).join("")).join("");
-
-    nextButton.disabled = !state.done;
-    status.textContent = state.message;
-    setMetrics("P1 Wins", state.p1Wins, "P2 Wins", state.p2Wins, "Turn", state.done ? "Done" : connectPlayerName(state.player));
-    setContext("Connect Board", [
-      { label: "Best P1", value: state.best },
-      { label: "P1 Wins", value: state.p1Wins },
-      { label: "P2 Wins", value: state.p2Wins },
-      { label: "State", value: state.message }
-    ]);
-  }
 }
 
 function createConnectBoard(rows, cols) {
   return Array.from({ length: rows }, () => Array(cols).fill(0));
+}
+
+function getConnectDropRow(board, col) {
+  for (let row = board.length - 1; row >= 0; row -= 1) {
+    if (!board[row][col]) return row;
+  }
+  return -1;
 }
 
 function dropConnectPiece(board, col, player) {
@@ -1224,20 +1455,26 @@ function dropConnectPiece(board, col, player) {
   return -1;
 }
 
-function connectHasWin(board, row, col, player) {
-  const directions = [
-    [0, 1],
-    [1, 0],
-    [1, 1],
-    [1, -1]
-  ];
+function connectWinLine(board, row, col, player) {
+  const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const [rowStep, colStep] of directions) {
+    const line = [[row, col]];
+    for (const [rs, cs] of [[rowStep, colStep], [-rowStep, -colStep]]) {
+      let r = row + rs;
+      let c = col + cs;
+      while (r >= 0 && r < board.length && c >= 0 && c < board[0].length && board[r][c] === player) {
+        line.push([r, c]);
+        r += rs;
+        c += cs;
+      }
+    }
+    if (line.length >= 4) return line;
+  }
+  return [];
+}
 
-  return directions.some(([rowStep, colStep]) => {
-    const total = 1
-      + connectCount(board, row, col, rowStep, colStep, player)
-      + connectCount(board, row, col, -rowStep, -colStep, player);
-    return total >= 4;
-  });
+function connectHasWin(board, row, col, player) {
+  return connectWinLine(board, row, col, player).length >= 4;
 }
 
 function connectCount(board, row, col, rowStep, colStep, player) {
@@ -1265,7 +1502,7 @@ function connectIsFull(board) {
 }
 
 function connectPlayerName(player) {
-  return player === 1 ? "P1" : "P2";
+  return player === 1 ? "Red" : "Yellow";
 }
 
 function renderWorld() {
@@ -1276,21 +1513,23 @@ function renderWorld() {
   const mapMinZoom = 1;
   const mapMaxZoom = 8;
   const mapZoomStep = 1.35;
+  const initialScope = getStoredChoice("gamehub.world.scope", worldScopeOptions, worldScopeAll);
   const state = {
     started: false,
-    practice: false,
+    practice: getStoredBoolean("gamehub.world.practice", false),
     done: false,
     revealed: false,
     timeLeft: duration,
     guessed: new Set(),
-    scope: worldScopeAll,
-    best: getBest(worldBestKey(worldScopeAll)),
+    scope: initialScope,
+    best: getBest(worldBestKey(initialScope)),
     last: "",
     message: "Ready",
     timer: null,
-    showBorders: true,
-    showMarkers: true,
-    showLabels: true,
+    showBorders: getStoredBoolean("gamehub.world.borders", true),
+    showMarkers: getStoredBoolean("gamehub.world.markers", true),
+    showLabels: getStoredBoolean("gamehub.world.labels", true),
+    showAnswers: false,
     mapZoom: 1,
     mapPanX: 0,
     mapPanY: 0
@@ -1301,16 +1540,26 @@ function renderWorld() {
   setHeader(game.title, game.genre);
   gamePanel.innerHTML = `
     <div class="world-shell">
-      <div class="world-controls">
-        <button class="play-button" id="worldStart" type="button">Start</button>
-        <button class="mode-button" id="worldPractice" type="button">Practice</button>
-        <button class="mode-button" id="worldGiveUp" type="button" disabled>Give Up</button>
+      <div class="world-setup" id="worldSetup">
         <label class="world-scope-control" for="worldScope">
           <span>Scope</span>
           <select class="world-scope-select" id="worldScope">
             ${worldScopeOptions.map((scope) => `<option value="${scope}">${worldScopeLabel(scope)}</option>`).join("")}
           </select>
         </label>
+        <div class="mode-switch world-mode-switch" role="group" aria-label="Game mode">
+          <button class="mode-button is-active" id="worldTimed" type="button" aria-pressed="true">Timed</button>
+          <button class="mode-button" id="worldPractice" type="button" aria-pressed="false">Practice</button>
+        </div>
+        <button class="play-button" id="worldStart" type="button">Start</button>
+      </div>
+      <div class="world-playbar" id="worldPlaybar" hidden>
+        <button class="world-settings-toggle" id="worldSettingsToggle" type="button" aria-expanded="false">Options</button>
+        <button class="mode-button" id="worldListToggle" type="button" aria-expanded="false">Show countries</button>
+        <button class="mode-button" id="worldGiveUp" type="button" disabled>Give Up</button>
+        <button class="play-button replay-button" id="worldAgain" type="button" hidden>Play again</button>
+      </div>
+      <div class="world-display-controls" id="worldDisplayControls" hidden>
         <label class="world-toggle">
           <input id="worldBorders" type="checkbox" checked>
           <span>Borders</span>
@@ -1324,19 +1573,26 @@ function renderWorld() {
           <span>Labels</span>
         </label>
       </div>
-      <form class="world-form" id="worldForm">
-        <label class="world-label" for="worldInput">Enter country:</label>
-        <input class="world-input" id="worldInput" autocomplete="off" spellcheck="false" disabled>
+      <form class="world-form" id="worldForm" hidden>
+        <label class="sr-only" for="worldInput">Enter country</label>
+        <input class="world-input" id="worldInput" autocomplete="off" spellcheck="false" placeholder="Type a country" disabled>
       </form>
+      <p class="world-status" id="worldStatus" aria-live="polite"></p>
       <div class="world-map" id="worldMap" aria-label="Region progress"></div>
       <div class="world-answers" id="worldAnswers" aria-label="Countries"></div>
-      <p class="world-status" id="worldStatus" aria-live="polite"></p>
     </div>
   `;
 
   const startButton = gamePanel.querySelector("#worldStart");
+  const timedButton = gamePanel.querySelector("#worldTimed");
   const practiceButton = gamePanel.querySelector("#worldPractice");
   const giveUpButton = gamePanel.querySelector("#worldGiveUp");
+  const againButton = gamePanel.querySelector("#worldAgain");
+  const setup = gamePanel.querySelector("#worldSetup");
+  const playbar = gamePanel.querySelector("#worldPlaybar");
+  const settingsToggle = gamePanel.querySelector("#worldSettingsToggle");
+  const listToggle = gamePanel.querySelector("#worldListToggle");
+  const displayControls = gamePanel.querySelector("#worldDisplayControls");
   const scopeSelect = gamePanel.querySelector("#worldScope");
   const bordersToggle = gamePanel.querySelector("#worldBorders");
   const markersToggle = gamePanel.querySelector("#worldMarkers");
@@ -1347,9 +1603,22 @@ function renderWorld() {
   const answers = gamePanel.querySelector("#worldAnswers");
   const status = gamePanel.querySelector("#worldStatus");
 
+  settingsToggle.addEventListener("click", () => {
+    const isHidden = displayControls.hidden;
+    displayControls.hidden = !isHidden;
+    settingsToggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
+    settingsToggle.textContent = isHidden ? "Hide options" : "Options";
+  });
+
+  listToggle.addEventListener("click", () => {
+    state.showAnswers = !state.showAnswers;
+    renderBoard();
+  });
+  againButton.addEventListener("click", () => loadGame("world"));
+
   startButton.addEventListener("click", () => {
     state.started = true;
-    state.message = "Go";
+    state.message = "Round started";
     startButton.disabled = true;
     giveUpButton.disabled = false;
     input.disabled = false;
@@ -1359,7 +1628,7 @@ function renderWorld() {
         state.timeLeft -= 1;
         if (state.timeLeft <= 0) {
           state.timeLeft = 0;
-          finishWorldGame(state, "Time");
+          finishWorldGame(state, "Time is up");
         }
         renderBoard();
       }, 1000);
@@ -1367,17 +1636,28 @@ function renderWorld() {
     renderBoard();
   });
 
+  timedButton.addEventListener("click", () => {
+    if (state.started) {
+      return;
+    }
+    state.practice = false;
+    setPreference("gamehub.world.practice", false);
+    state.message = "Timed mode";
+    renderBoard();
+  });
+
   practiceButton.addEventListener("click", () => {
     if (state.started) {
       return;
     }
-    state.practice = !state.practice;
-    state.message = state.practice ? "Practice" : "Ready";
+    state.practice = true;
+    setPreference("gamehub.world.practice", true);
+    state.message = "Practice mode";
     renderBoard();
   });
 
   giveUpButton.addEventListener("click", () => {
-    finishWorldGame(state, "Revealed");
+    finishWorldGame(state, "Round ended");
     state.revealed = true;
     renderBoard();
   });
@@ -1388,6 +1668,7 @@ function renderWorld() {
     }
 
     state.scope = scopeSelect.value;
+    setPreference("gamehub.world.scope", state.scope);
     state.guessed.clear();
     state.revealed = false;
     state.done = false;
@@ -1403,16 +1684,19 @@ function renderWorld() {
 
   bordersToggle.addEventListener("change", () => {
     state.showBorders = bordersToggle.checked;
+    setPreference("gamehub.world.borders", state.showBorders);
     renderBoard();
   });
 
   markersToggle.addEventListener("change", () => {
     state.showMarkers = markersToggle.checked;
+    setPreference("gamehub.world.markers", state.showMarkers);
     renderBoard();
   });
 
   labelsToggle.addEventListener("change", () => {
     state.showLabels = labelsToggle.checked;
+    setPreference("gamehub.world.labels", state.showLabels);
     renderBoard();
   });
 
@@ -1690,7 +1974,7 @@ function renderWorld() {
           <g class="world-map-viewport" transform="${getWorldMapTransform()}">
             <rect class="world-ocean" x="0" y="0" width="960" height="500" rx="18"></rect>
             <path class="world-graticule" d="M0 83.3 H960 M0 166.7 H960 M0 250 H960 M0 333.3 H960 M0 416.7 H960 M160 0 V500 M320 0 V500 M480 0 V500 M640 0 V500 M800 0 V500"></path>
-            <g class="world-country-layer">
+            <g class="world-country-layer" aria-hidden="true">
               ${worldMapCountries.map((country) => {
                 const isTarget = activeCountryNames.has(country.name);
                 const isGuessed = state.guessed.has(country.name);
@@ -1711,7 +1995,7 @@ function renderWorld() {
                 `;
               }).join("")}
             </g>
-            <g class="world-marker-layer">
+            <g class="world-marker-layer" aria-hidden="true">
               ${worldMapCountries.map((country) => {
                 const isTarget = activeCountryNames.has(country.name);
                 const isGuessed = state.guessed.has(country.name);
@@ -1735,7 +2019,7 @@ function renderWorld() {
                 `;
               }).join("")}
             </g>
-            <g class="world-label-layer">
+            <g class="world-label-layer" aria-hidden="true">
               ${worldMapCountries.map((country) => {
                 const isGuessed = state.guessed.has(country.name);
                 const [x, y] = country.marker || [];
@@ -1754,7 +2038,7 @@ function renderWorld() {
           </g>
         </svg>
       </div>
-      <div class="world-region-meters">
+      ${state.started ? `<div class="world-region-meters">
         ${continentSummaries.map(({ continent, count, countries, percent }) => `
           <div class="world-region-meter">
             <span>${continent}</span>
@@ -1762,7 +2046,7 @@ function renderWorld() {
             <i style="width: ${percent}%"></i>
           </div>
         `).join("")}
-      </div>
+      </div>` : ""}
     `;
 
     answers.innerHTML = Object.entries(byContinent).map(([continent, countries]) => `
@@ -1783,31 +2067,44 @@ function renderWorld() {
     `).join("");
 
     input.disabled = !state.started || state.done;
+    setup.hidden = state.started;
+    playbar.hidden = !state.started;
+    form.hidden = !state.started || state.done;
+    answers.hidden = !state.started || !state.showAnswers;
     startButton.disabled = state.started;
     giveUpButton.disabled = !state.started || state.done;
+    giveUpButton.hidden = state.done;
+    againButton.hidden = !state.done;
     practiceButton.classList.toggle("is-active", state.practice);
+    timedButton.classList.toggle("is-active", !state.practice);
+    practiceButton.setAttribute("aria-pressed", state.practice ? "true" : "false");
+    timedButton.setAttribute("aria-pressed", state.practice ? "false" : "true");
     practiceButton.disabled = state.started;
+    timedButton.disabled = state.started;
     scopeSelect.disabled = state.started;
     scopeSelect.value = state.scope;
     bordersToggle.checked = state.showBorders;
     markersToggle.checked = state.showMarkers;
     labelsToggle.checked = state.showLabels;
+    listToggle.textContent = state.showAnswers ? "Hide countries" : "Show countries";
+    listToggle.setAttribute("aria-expanded", state.showAnswers ? "true" : "false");
     status.textContent = state.message;
+    status.dataset.tone = state.done
+      ? (state.message === "Perfect" ? "correct" : "error")
+      : state.last && state.message === state.last ? "correct" : "neutral";
+    setGamePhase(!state.started ? "ready" : state.done ? "result" : "playing");
     applyWorldMapTransform();
 
-    setMetrics("Score", `${state.guessed.size}/${activeCountries.length}`, "Best", state.best, "Timer", state.practice ? "Practice" : formatWorldTime(state.timeLeft));
-    setContext("World Board", [
-      { label: "Mode", value: state.practice ? "Practice" : "Timed" },
-      { label: "Scope", value: worldScopeLabel(state.scope) },
-      { label: "Remaining", value: activeCountries.length - state.guessed.size },
-      { label: "Last", value: state.last || "--" },
-      { label: "State", value: state.done ? "Done" : state.started ? "Live" : "Ready" }
-    ]);
+    const remaining = activeCountries.length - state.guessed.size;
+    const timer = state.practice ? "Practice" : formatWorldTime(state.timeLeft);
+    setMetrics("Score", `${state.guessed.size}/${activeCountries.length}`, "Remaining", remaining, "Timer", timer);
+    showContextPanel(false);
   }
 }
 
 function finishWorldGame(state, message) {
   state.done = true;
+  state.revealed = true;
   state.message = message;
   state.best = setBest(worldBestKey(state.scope || worldScopeAll), state.guessed.size);
   if (state.timer) {
@@ -1891,10 +2188,11 @@ function formatWorldTime(seconds) {
 function renderCountryShape() {
   const game = catalog.find((item) => item.id === "shape");
   const maxRounds = 20;
+  const initialScope = getStoredChoice("gamehub.shape.scope", worldScopeOptions, worldScopeAll);
   const state = {
-    scope: worldScopeAll,
-    mode: "type",
-    rotate: false,
+    scope: initialScope,
+    mode: getStoredChoice("gamehub.shape.mode", ["type", "mcq"], "type"),
+    rotate: getStoredBoolean("gamehub.shape.rotate", false),
     pool: [],
     used: new Set(),
     current: null,
@@ -1917,8 +2215,15 @@ function renderCountryShape() {
   setHeader(game.title, game.genre);
   gamePanel.innerHTML = `
     <div class="shape-shell">
-      <div class="shape-controls">
-        <button class="play-button" id="shapeNewSet" type="button">New Set</button>
+      <div class="shape-toolbar">
+        <button class="world-settings-toggle" id="shapeSettingsToggle" type="button" aria-expanded="false">Options</button>
+        <div class="shape-round-actions">
+          <button class="mode-button" id="shapeHint" type="button">Hint</button>
+          <button class="mode-button" id="shapeSkip" type="button">Skip</button>
+          <button class="play-button" id="shapeNext" type="button" hidden>Next</button>
+        </div>
+      </div>
+      <div class="shape-settings" id="shapeSettings" hidden>
         <label class="world-scope-control" for="shapeScope">
           <span>Scope</span>
           <select class="world-scope-select" id="shapeScope">
@@ -1927,15 +2232,13 @@ function renderCountryShape() {
         </label>
         <label class="world-toggle">
           <input id="shapeMcq" type="checkbox">
-          <span>MCQ</span>
+          <span>Choices</span>
         </label>
         <label class="world-toggle">
           <input id="shapeRotate" type="checkbox">
           <span>Rotate</span>
         </label>
-        <button class="mode-button" id="shapeHint" type="button">Hint</button>
-        <button class="mode-button" id="shapeSkip" type="button">Skip</button>
-        <button class="mode-button" id="shapeNext" type="button" disabled>Next</button>
+        <button class="mode-button" id="shapeNewSet" type="button">New game</button>
       </div>
       <div class="shape-card" id="shapeCard" aria-label="Country silhouette"></div>
       <form class="shape-form" id="shapeForm">
@@ -1949,6 +2252,8 @@ function renderCountryShape() {
   `;
 
   const newSetButton = gamePanel.querySelector("#shapeNewSet");
+  const settingsToggle = gamePanel.querySelector("#shapeSettingsToggle");
+  const settings = gamePanel.querySelector("#shapeSettings");
   const scopeSelect = gamePanel.querySelector("#shapeScope");
   const mcqToggle = gamePanel.querySelector("#shapeMcq");
   const rotateToggle = gamePanel.querySelector("#shapeRotate");
@@ -1962,22 +2267,37 @@ function renderCountryShape() {
   const choices = gamePanel.querySelector("#shapeChoices");
   const status = gamePanel.querySelector("#shapeStatus");
 
-  newSetButton.addEventListener("click", resetShapeSet);
+  settingsToggle.addEventListener("click", () => {
+    const isHidden = settings.hidden;
+    settings.hidden = !isHidden;
+    settingsToggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
+    settingsToggle.textContent = isHidden ? "Hide options" : "Options";
+  });
+
+  newSetButton.addEventListener("click", () => {
+    settings.hidden = true;
+    settingsToggle.setAttribute("aria-expanded", "false");
+    settingsToggle.textContent = "Options";
+    resetShapeSet();
+  });
 
   scopeSelect.addEventListener("change", () => {
     state.scope = scopeSelect.value;
+    setPreference("gamehub.shape.scope", state.scope);
     resetShapeSet();
   });
 
   mcqToggle.addEventListener("change", () => {
     state.mode = mcqToggle.checked ? "mcq" : "type";
-    state.message = state.mode === "mcq" ? "Pick the country" : "Name the silhouette";
+    setPreference("gamehub.shape.mode", state.mode);
+    state.message = state.mode === "mcq" ? "Choose a country" : "Name the silhouette";
     renderBoard();
     focusShapeInput();
   });
 
   rotateToggle.addEventListener("change", () => {
     state.rotate = rotateToggle.checked;
+    setPreference("gamehub.shape.rotate", state.rotate);
     if (state.current && !state.locked && !state.done) {
       state.angle = randomShapeAngle(state.rotate);
     }
@@ -2068,7 +2388,9 @@ function renderCountryShape() {
     state.locked = false;
     state.current = null;
     state.last = "--";
-    state.message = state.pool.length ? "Name the silhouette" : "No country shapes here";
+    state.message = state.pool.length
+      ? (state.mode === "mcq" ? "Choose a country" : "Name the silhouette")
+      : "No country shapes here";
 
     if (!state.pool.length) {
       renderBoard();
@@ -2104,7 +2426,7 @@ function renderCountryShape() {
     state.hintUsed = false;
     state.locked = false;
     state.angle = randomShapeAngle(state.rotate);
-    state.message = state.mode === "mcq" ? "Pick the country" : "Name the silhouette";
+    state.message = state.mode === "mcq" ? "Choose a country" : "Name the silhouette";
     renderBoard();
     focusShapeInput();
   }
@@ -2156,14 +2478,17 @@ function renderCountryShape() {
     mcqToggle.checked = state.mode === "mcq";
     rotateToggle.checked = state.rotate;
 
-    form.classList.toggle("is-hidden", !isTypeMode);
+    form.classList.toggle("is-hidden", !isTypeMode || state.locked || state.done);
     choices.classList.toggle("is-hidden", isTypeMode);
     input.disabled = !isTypeMode || state.locked || state.done || !state.current;
     submitButton.disabled = input.disabled;
     hintButton.disabled = state.locked || state.done || !state.current;
     skipButton.disabled = state.locked || state.done || !state.current;
     nextButton.disabled = !state.locked && !state.done;
-    nextButton.textContent = state.done ? "New Set" : "Next";
+    hintButton.hidden = state.locked || state.done;
+    skipButton.hidden = state.locked || state.done;
+    nextButton.hidden = !state.locked && !state.done;
+    nextButton.textContent = state.done ? "New game" : "Next";
 
     card.innerHTML = state.current ? shapeCardMarkup(state.current) : `
       <div class="shape-empty">No country shapes available</div>
@@ -2185,19 +2510,18 @@ function renderCountryShape() {
     }).join("") : "";
 
     status.textContent = state.message;
+    status.dataset.tone = state.message.startsWith("Correct")
+      ? "correct"
+      : state.message.includes("starts with")
+        ? "close"
+        : state.wrong || state.locked ? "error" : "neutral";
+    setGamePhase(state.locked || state.done ? "result" : "playing");
 
     const round = state.done || state.locked
       ? `${state.completed}/${state.roundLimit || maxRounds}`
       : `${Math.min(state.completed + 1, state.roundLimit || maxRounds)}/${state.roundLimit || maxRounds}`;
     setMetrics("Score", `${state.score}/${state.roundLimit || maxRounds}`, "Best", state.best, "Round", round);
-    setContext("Shape Board", [
-      { label: "Mode", value: state.mode === "mcq" ? "MCQ" : "Type" },
-      { label: "Scope", value: worldScopeLabel(state.scope) },
-      { label: "Streak", value: state.streak },
-      { label: "Rotation", value: state.rotate ? `${state.angle} deg` : "Off" },
-      { label: "Hint", value: state.hintUsed ? "Used" : "Ready" },
-      { label: "Last", value: state.last }
-    ]);
+    showContextPanel(false);
   }
 
   function shapeCardMarkup(country) {
@@ -2212,7 +2536,7 @@ function renderCountryShape() {
           <path class="shape-path ${state.locked ? "is-revealed" : ""}" d="${country.path}"></path>
         </g>
       </svg>
-      <div class="shape-reveal ${state.locked || state.done ? "is-visible" : ""}">${country.name}</div>
+      <div class="shape-reveal ${state.locked || state.done ? "is-visible" : ""}" aria-hidden="${state.locked || state.done ? "false" : "true"}">${country.name}</div>
     `;
   }
 
@@ -2321,12 +2645,14 @@ function svgNumber(value) {
 
 function renderTicTacToe() {
   const game = catalog.find((item) => item.id === "tictactoe");
+  const initialMode = getStoredChoice("gamehub.tictactoe.mode", ["bot", "duo"], "bot");
   const state = {
     board: Array(9).fill(""),
-    mode: "bot",
+    mode: initialMode,
     turn: "X",
     done: false,
     xWins: 0,
+    oWins: 0,
     best: getBest(game.bestKey),
     pendingBot: null
   };
@@ -2335,14 +2661,18 @@ function renderTicTacToe() {
   gamePanel.innerHTML = `
     <div class="ttt-shell">
       <div class="mode-switch" role="group" aria-label="Mode">
-        <button class="mode-button is-active" type="button" data-mode="bot">Bot</button>
-        <button class="mode-button" type="button" data-mode="duo">Duo</button>
+        <button class="mode-button ${initialMode === "bot" ? "is-active" : ""}" type="button" data-mode="bot" aria-pressed="${initialMode === "bot"}">Computer</button>
+        <button class="mode-button ${initialMode === "duo" ? "is-active" : ""}" type="button" data-mode="duo" aria-pressed="${initialMode === "duo"}">Two players</button>
       </div>
+      <p class="ttt-status" id="tttStatus" aria-live="polite"></p>
       <div class="ttt-board" id="tttBoard" aria-label="Tic Tac Toe board"></div>
+      <button class="play-button replay-button" id="tttAgain" type="button" hidden>Play again</button>
     </div>
   `;
 
   const board = gamePanel.querySelector("#tttBoard");
+  const status = gamePanel.querySelector("#tttStatus");
+  const againButton = gamePanel.querySelector("#tttAgain");
   const modeButtons = Array.from(gamePanel.querySelectorAll("[data-mode]"));
 
   modeButtons.forEach((button) => {
@@ -2352,12 +2682,21 @@ function renderTicTacToe() {
         state.pendingBot = null;
       }
       state.mode = button.dataset.mode;
+      setPreference("gamehub.tictactoe.mode", state.mode);
       state.board = Array(9).fill("");
       state.turn = "X";
       state.done = false;
       modeButtons.forEach((item) => item.classList.toggle("is-active", item === button));
+      modeButtons.forEach((item) => item.setAttribute("aria-pressed", item === button ? "true" : "false"));
       renderBoard();
     });
+  });
+
+  againButton.addEventListener("click", () => {
+    state.board = Array(9).fill("");
+    state.turn = "X";
+    state.done = false;
+    renderBoard();
   });
 
   board.addEventListener("click", (event) => {
@@ -2392,23 +2731,29 @@ function renderTicTacToe() {
   };
 
   function renderBoard() {
-    board.innerHTML = state.board.map((mark, index) => `
-      <button class="ttt-cell" type="button" data-index="${index}" data-mark="${mark}" aria-label="Cell ${index + 1}">${mark}</button>
-    `).join("");
-
     const result = ticTacToeResult(state.board);
+    const winCells = result.winner ? getWinLine(state.board) : [];
+
+    board.innerHTML = state.board.map((mark, index) => {
+      const isWinner = winCells.includes(index);
+      const isDisabled = state.done || Boolean(mark) || (state.mode === "bot" && state.turn === "O");
+      return `
+        <button class="ttt-cell ${isWinner ? "is-winner" : ""}" type="button" data-index="${index}" data-mark="${mark}" aria-label="Cell ${index + 1}" ${isDisabled ? "disabled" : ""}>${mark}</button>
+      `;
+    }).join("");
+
     const stateLabel = result.winner
       ? `${result.winner} wins`
       : result.draw
         ? "Draw"
-        : `${state.turn} turn`;
+        : `${state.turn}'s turn`;
 
-    setMetrics("X Wins", state.xWins, "Best", state.best, "State", stateLabel);
-    setContext("Round Board", [
-      { label: "Mode", value: state.mode === "bot" ? "Bot" : "Duo" },
-      { label: "X Wins", value: state.xWins },
-      { label: "State", value: stateLabel }
-    ]);
+    status.textContent = stateLabel;
+    status.dataset.turn = state.done ? "" : state.turn;
+    againButton.hidden = !state.done;
+    setGamePhase(state.done ? "result" : "playing");
+    setMetrics("X Wins", state.xWins, "O Wins", state.oWins, "Best", state.best || "—");
+    showContextPanel(false);
   }
 }
 
@@ -2425,6 +2770,8 @@ function playTicTacToeMove(index, state, bestKey) {
     if (result.winner === "X") {
       state.xWins += 1;
       state.best = setBest(bestKey, state.xWins);
+    } else if (result.winner === "O") {
+      state.oWins += 1;
     }
     return;
   }
@@ -2452,6 +2799,20 @@ function ticTacToeResult(board) {
   }
 
   return { winner: "", draw: board.every(Boolean) };
+}
+
+function getWinLine(board) {
+  const wins = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8],
+    [0, 3, 6], [1, 4, 7], [2, 5, 8],
+    [0, 4, 8], [2, 4, 6]
+  ];
+  for (const [a, b, c] of wins) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+      return [a, b, c];
+    }
+  }
+  return [];
 }
 
 function chooseBotMove(board) {
@@ -2520,6 +2881,11 @@ function renderTarget() {
   `).join("");
 
   grid.addEventListener("click", (event) => {
+    if (event.target.closest("[data-target-replay]")) {
+      loadGame("target");
+      return;
+    }
+
     const cell = event.target.closest(".target-cell");
     if (!cell || !state.live) {
       return;
@@ -2565,17 +2931,26 @@ function renderTarget() {
   };
 
   function renderGrid() {
+    grid.classList.toggle("is-done", !state.live);
     grid.querySelectorAll(".target-cell").forEach((cell) => {
       cell.classList.toggle("is-live", Number(cell.dataset.index) === state.active && state.live);
     });
 
     timeBar.style.width = `${(state.time / 30) * 100}%`;
-    setMetrics("Score", state.score, "Best", state.best, "Time", state.time);
-    setContext("Reflex Board", [
-      { label: "Score", value: state.score },
-      { label: "Combo", value: state.combo },
-      { label: "State", value: state.live ? "Live" : "Done" }
-    ]);
+    setGamePhase(state.live ? "playing" : "result");
+    setMetrics("Score", state.score, "Best", state.best || "—", "Time", `${state.time}s`);
+    showContextPanel(false);
+
+    if (!state.live) {
+      grid.innerHTML = `
+        <div class="target-done">
+          <p class="target-done-label">Final Score</p>
+          <p class="target-done-score">${state.score}</p>
+          ${state.score > 0 && state.score === state.best ? '<p class="target-done-label is-best">New best</p>' : ""}
+          <button class="play-button replay-button" type="button" data-target-replay>Play again</button>
+        </div>
+      `;
+    }
   }
 }
 
