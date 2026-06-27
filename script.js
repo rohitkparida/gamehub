@@ -18,6 +18,7 @@ const metricEls = {
 const catalog = [
   { id: "snake", title: "Snake Run", genre: "Arcade", duration: "3 min", difficulty: "Medium", bestKey: "gamehub.snake.best" },
   { id: "memory", title: "Memory Match", genre: "Puzzle", duration: "4 min", difficulty: "Easy", bestKey: "gamehub.memory.best" },
+  { id: "tetris", title: "Tetris", genre: "Arcade", duration: "Endless", difficulty: "Medium", bestKey: "gamehub.tetris.best" },
   { id: "poople", title: "Poople", genre: "Word", duration: "3 min", difficulty: "Medium", bestKey: "gamehub.poople.steps.best" },
   { id: "angle", title: "Guess the Angle", genre: "Precision", duration: "5 min", difficulty: "Medium", bestKey: "gamehub.angle.hotcold.best" },
   { id: "connect4", title: "Connect 4", genre: "Strategy", duration: "5 min", difficulty: "Easy", bestKey: "gamehub.connect4.best" },
@@ -31,6 +32,7 @@ const renderers = {
   hub: renderHub,
   snake: renderSnake,
   memory: renderMemory,
+  tetris: renderTetris,
   poople: renderPoople,
   angle: renderAngle,
   connect4: renderConnect4,
@@ -336,7 +338,7 @@ function renderHub() {
   setMetrics("Games", catalog.length, "State", "Ready", "Library", "Local");
   showContextPanel(false);
 
-  const quickIds = ["snake", "memory", "tictactoe", "target"];
+  const quickIds = ["snake", "tetris", "memory", "tictactoe", "target"];
   const skillIds = ["poople", "angle", "connect4", "world", "shape"];
   const quickGames = catalog.filter((g) => quickIds.includes(g.id));
   const skillGames = catalog.filter((g) => skillIds.includes(g.id));
@@ -407,6 +409,14 @@ function previewMarkup(id) {
     `;
   }
 
+  if (id === "tetris") {
+    return `
+      <div class="game-preview preview-tetris" aria-hidden="true">
+        ${Array.from({ length: 60 }, (_, index) => `<span class="${tetrisPreviewClass(index)}"></span>`).join("")}
+      </div>
+    `;
+  }
+
   if (id === "poople") {
     const previewWords = ["BOOK", "COOK", "COOP", "POOP"];
     return `
@@ -463,6 +473,16 @@ function connectPreviewClass(index) {
     return "is-yellow";
   }
   return "";
+}
+
+function tetrisPreviewClass(index) {
+  const blocks = {
+    28: "is-i", 34: "is-i", 40: "is-i", 46: "is-i",
+    38: "is-t", 43: "is-t", 44: "is-t", 45: "is-t",
+    48: "is-o", 49: "is-o", 54: "is-o", 55: "is-o",
+    50: "is-l", 56: "is-l", 57: "is-l", 58: "is-l"
+  };
+  return blocks[index] || "";
 }
 
 function bestLabel(id) {
@@ -845,6 +865,423 @@ function memoryQualityRating(moves) {
   if (moves <= 18) return { cls: "rating-good", label: "Good" };
   if (moves <= 26) return { cls: "rating-fair", label: "Fair" };
   return { cls: "rating-fair", label: "Keep practising" };
+}
+
+function renderTetris() {
+  const game = catalog.find((item) => item.id === "tetris");
+  const rows = 20;
+  const cols = 10;
+  const pieces = {
+    I: { matrix: [[1, 1, 1, 1]], color: "#31c7ef" },
+    J: { matrix: [[1, 0, 0], [1, 1, 1]], color: "#4b61d1" },
+    L: { matrix: [[0, 0, 1], [1, 1, 1]], color: "#f29d38" },
+    O: { matrix: [[1, 1], [1, 1]], color: "#f4d35e" },
+    S: { matrix: [[0, 1, 1], [1, 1, 0]], color: "#55b86a" },
+    T: { matrix: [[0, 1, 0], [1, 1, 1]], color: "#9b5de5" },
+    Z: { matrix: [[1, 1, 0], [0, 1, 1]], color: "#ef5b5b" }
+  };
+  const state = {
+    board: Array.from({ length: rows }, () => Array(cols).fill("")),
+    bag: [],
+    piece: null,
+    nextType: "",
+    score: 0,
+    lines: 0,
+    level: 1,
+    best: getBest(game.bestKey),
+    live: true,
+    paused: false,
+    timer: null
+  };
+
+  setHeader(game.title, game.genre);
+  gamePanel.innerHTML = `
+    <div class="tetris-shell">
+      <div class="tetris-layout">
+        <div class="tetris-board-wrap">
+          <canvas class="tetris-canvas" id="tetrisCanvas" width="300" height="600" role="img" aria-label="Tetris board"></canvas>
+          <div class="tetris-result" id="tetrisResult" hidden>
+            <div class="game-result-copy">
+              <p class="tetris-result-title">Stack topped out</p>
+              <p class="tetris-result-score" id="tetrisFinalScore"></p>
+              <p class="tetris-result-best" id="tetrisFinalBest"></p>
+              <button class="play-button replay-button" id="tetrisAgain" type="button">Play again</button>
+            </div>
+          </div>
+        </div>
+        <div class="tetris-side">
+          <div class="tetris-next">
+            <span>Next</span>
+            <canvas id="tetrisNext" width="120" height="120" aria-hidden="true"></canvas>
+          </div>
+          <button class="mode-button tetris-pause" id="tetrisPause" type="button">Pause</button>
+        </div>
+      </div>
+      <p class="tetris-status" id="tetrisStatus" aria-live="polite"></p>
+      <div class="tetris-controls" aria-label="Tetris controls">
+        <button type="button" data-tetris-action="left" aria-label="Move left" title="Move left">&#8592;</button>
+        <button type="button" data-tetris-action="rotate" aria-label="Rotate" title="Rotate">&#8635;</button>
+        <button type="button" data-tetris-action="right" aria-label="Move right" title="Move right">&#8594;</button>
+        <button type="button" data-tetris-action="down" aria-label="Move down" title="Move down">&#8595;</button>
+        <button type="button" data-tetris-action="drop" aria-label="Hard drop" title="Hard drop">&#8659;</button>
+      </div>
+    </div>
+  `;
+
+  const canvas = gamePanel.querySelector("#tetrisCanvas");
+  const nextCanvas = gamePanel.querySelector("#tetrisNext");
+  const pauseButton = gamePanel.querySelector("#tetrisPause");
+  const againButton = gamePanel.querySelector("#tetrisAgain");
+  const result = gamePanel.querySelector("#tetrisResult");
+  const finalScore = gamePanel.querySelector("#tetrisFinalScore");
+  const finalBest = gamePanel.querySelector("#tetrisFinalBest");
+  const status = gamePanel.querySelector("#tetrisStatus");
+  const controls = Array.from(gamePanel.querySelectorAll("[data-tetris-action]"));
+  const ctx = canvas.getContext("2d");
+  const nextCtx = nextCanvas.getContext("2d");
+
+  state.nextType = takeTetrisType();
+  spawnTetrisPiece();
+  scheduleTetrisDrop();
+  renderTetrisBoard();
+
+  controls.forEach((button) => {
+    button.addEventListener("click", () => performTetrisAction(button.dataset.tetrisAction));
+  });
+  pauseButton.addEventListener("click", toggleTetrisPause);
+  againButton.addEventListener("click", () => loadGame("tetris"));
+
+  const keyHandler = (event) => {
+    const actionMap = {
+      ArrowLeft: "left",
+      ArrowRight: "right",
+      ArrowDown: "down",
+      ArrowUp: "rotate",
+      x: "rotate",
+      X: "rotate",
+      z: "rotate-left",
+      Z: "rotate-left",
+      " ": "drop",
+      p: "pause",
+      P: "pause"
+    };
+    const action = actionMap[event.key];
+    if (!action) {
+      return;
+    }
+    event.preventDefault();
+    performTetrisAction(action);
+  };
+
+  window.addEventListener("keydown", keyHandler);
+  cleanupCurrent = () => {
+    window.clearTimeout(state.timer);
+    window.removeEventListener("keydown", keyHandler);
+  };
+
+  function takeTetrisType() {
+    if (!state.bag.length) {
+      state.bag = shuffle(Object.keys(pieces));
+    }
+    return state.bag.pop();
+  }
+
+  function spawnTetrisPiece() {
+    const type = state.nextType;
+    const matrix = pieces[type].matrix.map((row) => [...row]);
+    state.nextType = takeTetrisType();
+    state.piece = {
+      type,
+      matrix,
+      x: Math.floor((cols - matrix[0].length) / 2),
+      y: 0
+    };
+
+    if (!isTetrisPositionValid(state.piece.matrix, state.piece.x, state.piece.y)) {
+      endTetrisGame();
+    }
+  }
+
+  function performTetrisAction(action) {
+    if (action === "pause") {
+      toggleTetrisPause();
+      return;
+    }
+    if (!state.live || state.paused) {
+      return;
+    }
+
+    if (action === "left") {
+      tryTetrisMove(-1, 0);
+    } else if (action === "right") {
+      tryTetrisMove(1, 0);
+    } else if (action === "down") {
+      if (tryTetrisMove(0, 1)) {
+        state.score += 1;
+      } else {
+        lockTetrisPiece();
+        scheduleTetrisDrop();
+      }
+    } else if (action === "rotate" || action === "rotate-left") {
+      tryTetrisRotate(action === "rotate" ? 1 : -1);
+    } else if (action === "drop") {
+      let distance = 0;
+      while (tryTetrisMove(0, 1)) {
+        distance += 1;
+      }
+      state.score += distance * 2;
+      lockTetrisPiece();
+      scheduleTetrisDrop();
+    }
+
+    renderTetrisBoard();
+  }
+
+  function tryTetrisMove(xStep, yStep) {
+    const nextX = state.piece.x + xStep;
+    const nextY = state.piece.y + yStep;
+    if (!isTetrisPositionValid(state.piece.matrix, nextX, nextY)) {
+      return false;
+    }
+    state.piece.x = nextX;
+    state.piece.y = nextY;
+    return true;
+  }
+
+  function tryTetrisRotate(direction) {
+    const rotated = rotateTetrisMatrix(state.piece.matrix, direction);
+    const kicks = [0, -1, 1, -2, 2];
+    for (const kick of kicks) {
+      if (isTetrisPositionValid(rotated, state.piece.x + kick, state.piece.y)) {
+        state.piece.matrix = rotated;
+        state.piece.x += kick;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function rotateTetrisMatrix(matrix, direction) {
+    let rotated = matrix.map((row) => [...row]);
+    const turns = direction > 0 ? 1 : 3;
+    for (let turn = 0; turn < turns; turn += 1) {
+      rotated = rotated[0].map((_, column) => rotated.map((row) => row[column]).reverse());
+    }
+    return rotated;
+  }
+
+  function isTetrisPositionValid(matrix, x, y) {
+    for (let row = 0; row < matrix.length; row += 1) {
+      for (let column = 0; column < matrix[row].length; column += 1) {
+        if (!matrix[row][column]) {
+          continue;
+        }
+        const boardX = x + column;
+        const boardY = y + row;
+        if (boardX < 0 || boardX >= cols || boardY >= rows) {
+          return false;
+        }
+        if (boardY >= 0 && state.board[boardY][boardX]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function lockTetrisPiece() {
+    state.piece.matrix.forEach((row, rowIndex) => {
+      row.forEach((cell, columnIndex) => {
+        if (cell) {
+          state.board[state.piece.y + rowIndex][state.piece.x + columnIndex] = state.piece.type;
+        }
+      });
+    });
+
+    const remainingRows = state.board.filter((row) => !row.every(Boolean));
+    const cleared = rows - remainingRows.length;
+    while (remainingRows.length < rows) {
+      remainingRows.unshift(Array(cols).fill(""));
+    }
+    state.board = remainingRows;
+
+    if (cleared) {
+      const lineScores = [0, 100, 300, 500, 800];
+      state.score += lineScores[cleared] * state.level;
+      state.lines += cleared;
+      state.level = Math.floor(state.lines / 10) + 1;
+    }
+
+    state.best = setBest(game.bestKey, state.score);
+    spawnTetrisPiece();
+  }
+
+  function scheduleTetrisDrop() {
+    window.clearTimeout(state.timer);
+    if (!state.live || state.paused) {
+      return;
+    }
+    const delay = Math.max(90, 800 - ((state.level - 1) * 65));
+    state.timer = window.setTimeout(() => {
+      if (!tryTetrisMove(0, 1)) {
+        lockTetrisPiece();
+      }
+      renderTetrisBoard();
+      scheduleTetrisDrop();
+    }, delay);
+  }
+
+  function toggleTetrisPause() {
+    if (!state.live) {
+      return;
+    }
+    state.paused = !state.paused;
+    if (state.paused) {
+      window.clearTimeout(state.timer);
+    } else {
+      scheduleTetrisDrop();
+    }
+    renderTetrisBoard();
+  }
+
+  function endTetrisGame() {
+    state.live = false;
+    state.paused = false;
+    state.best = setBest(game.bestKey, state.score);
+    window.clearTimeout(state.timer);
+  }
+
+  function renderTetrisBoard() {
+    drawTetrisCanvas(ctx, canvas, state, pieces, cols, rows);
+    drawTetrisNext(nextCtx, nextCanvas, pieces[state.nextType]);
+    pauseButton.disabled = !state.live;
+    pauseButton.textContent = state.paused ? "Resume" : "Pause";
+    controls.forEach((button) => {
+      button.disabled = !state.live || state.paused;
+    });
+    status.textContent = !state.live ? "Game over" : state.paused ? "Paused" : "Playing";
+    status.dataset.tone = state.live ? "neutral" : "error";
+    result.hidden = state.live;
+    finalScore.textContent = `${state.score} points`;
+    finalBest.textContent = `Best ${state.best || state.score}`;
+    setGamePhase(state.live ? (state.paused ? "ready" : "playing") : "result");
+    setMetrics("Score", state.score, "Lines", state.lines, "Level", state.level);
+    showContextPanel(false);
+  }
+}
+
+function drawTetrisCanvas(ctx, canvas, state, pieces, cols, rows) {
+  const cell = canvas.width / cols;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#111418";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = "rgba(255,255,255,0.055)";
+  ctx.lineWidth = 1;
+  for (let column = 0; column <= cols; column += 1) {
+    const x = Math.round(column * cell) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  for (let row = 0; row <= rows; row += 1) {
+    const y = Math.round(row * cell) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y);
+    ctx.stroke();
+  }
+
+  state.board.forEach((row, rowIndex) => {
+    row.forEach((type, columnIndex) => {
+      if (type) {
+        drawTetrisBlock(ctx, columnIndex, rowIndex, cell, pieces[type].color, false);
+      }
+    });
+  });
+
+  if (state.piece && state.live) {
+    let ghostY = state.piece.y;
+    const isValidAt = (y) => {
+      for (let row = 0; row < state.piece.matrix.length; row += 1) {
+        for (let column = 0; column < state.piece.matrix[row].length; column += 1) {
+          if (!state.piece.matrix[row][column]) {
+            continue;
+          }
+          const boardX = state.piece.x + column;
+          const boardY = y + row;
+          if (boardY >= rows || (boardY >= 0 && state.board[boardY][boardX])) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+    while (isValidAt(ghostY + 1)) {
+      ghostY += 1;
+    }
+
+    state.piece.matrix.forEach((row, rowIndex) => {
+      row.forEach((filled, columnIndex) => {
+        if (!filled) {
+          return;
+        }
+        drawTetrisBlock(ctx, state.piece.x + columnIndex, ghostY + rowIndex, cell, pieces[state.piece.type].color, true);
+        drawTetrisBlock(ctx, state.piece.x + columnIndex, state.piece.y + rowIndex, cell, pieces[state.piece.type].color, false);
+      });
+    });
+  }
+
+  if (state.paused) {
+    ctx.fillStyle = "rgba(17,20,24,0.78)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "800 28px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Paused", canvas.width / 2, canvas.height / 2);
+  }
+}
+
+function drawTetrisBlock(ctx, x, y, size, color, ghost) {
+  if (y < 0) {
+    return;
+  }
+  const inset = ghost ? 5 : 2;
+  ctx.save();
+  ctx.globalAlpha = ghost ? 0.34 : 1;
+  ctx.fillStyle = ghost ? "transparent" : color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = ghost ? 2 : 1;
+  ctx.fillRect((x * size) + inset, (y * size) + inset, size - (inset * 2), size - (inset * 2));
+  ctx.strokeRect((x * size) + inset + 0.5, (y * size) + inset + 0.5, size - (inset * 2) - 1, size - (inset * 2) - 1);
+  if (!ghost) {
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    ctx.fillRect((x * size) + 4, (y * size) + 4, size - 8, 3);
+  }
+  ctx.restore();
+}
+
+function drawTetrisNext(ctx, canvas, piece) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#111418";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const size = 24;
+  const width = piece.matrix[0].length * size;
+  const height = piece.matrix.length * size;
+  const startX = (canvas.width - width) / 2;
+  const startY = (canvas.height - height) / 2;
+  piece.matrix.forEach((row, rowIndex) => {
+    row.forEach((filled, columnIndex) => {
+      if (!filled) {
+        return;
+      }
+      ctx.fillStyle = piece.color;
+      ctx.fillRect(startX + (columnIndex * size) + 2, startY + (rowIndex * size) + 2, size - 4, size - 4);
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.strokeRect(startX + (columnIndex * size) + 2.5, startY + (rowIndex * size) + 2.5, size - 5, size - 5);
+    });
+  });
 }
 
 function renderPoople() {
